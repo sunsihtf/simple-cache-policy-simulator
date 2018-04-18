@@ -1,0 +1,21 @@
+[settings]
+
+TRACE                       = D:\TencentTrace final\trace_all_sample
+UPLOADED_INFO               = D:\TencentTrace final\time_id_size
+OUTPUT_PREFIX               = hr_
+
+METHOD                      = online_slru
+INCREASE_CACHE_SIZE_UNIT    = 10
+INITIAL_CACHE_SIZE          = 10
+CUMULATE_TIMES              = 10
+WARM_LEN                    = 20160206000000
+
+PREFETCH_MODE               = 1
+PREFETCH_MODE2              = 0
+PREFETCH_INTERVAL           = 600
+SMART_EVICT_FLAG            = 0
+FREQ_THRESHOLD              = 1 2 3 4 5 6
+TIMTOUT_THRESHOLD           = 6 12 18 24 30 36
+
+STAT_FLAG                   = 0
+STAT_OUTPUT                 = life_time_stat
