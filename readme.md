@@ -128,3 +128,7 @@ _arguments.txt_ gives an example of all arguments, either side of `=` are argus 
 * [github/sunsihtf](https://github.com/sunsihtf)
 
 If you encounter any problems, please opening them as issues.
+
+## License
+
+MIT License
