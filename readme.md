@@ -7,7 +7,7 @@ Simple Cache Policy Simulator is an experimental program to evaluate various cac
 * an online prefetching module integrated with lru----online_lru.
 * an online prefetching module integrated with slru(s3lru)----online_slru.
 
-Besides, the online prefetching module with lru also is supported smart evciting by a switch.
+Besides, the online prefetching module with lru supports smart evciting controlled by a switchon.
 
 ## Platform
 
