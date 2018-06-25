@@ -14,6 +14,7 @@ PREFETCH_MODE               = 1
 PREFETCH_MODE2              = 0
 PREFETCH_INTERVAL           = 600
 SMART_EVICT_FLAG            = 0
+SMART_EVICT2_FLAG           = 0
 FREQ_THRESHOLD              = 1 2 3 4 5 6
 TIMTOUT_THRESHOLD           = 6 12 18 24 30 36
 

@@ -10,7 +10,7 @@ import pdb
 
 
 class OnLine_LRU(general.ReplaceAlgo):
-    def __init__(self, cache_capacity, p_interval, p_mode1, p_mode2, f_uploaded, smart_evict_flag = False, freq_threshold = 1, timeout = 6, stat_flag = False, stat_output = ''):
+    def __init__(self, cache_capacity, p_interval, p_mode1, p_mode2, f_uploaded, smart_evict_flag=False, freq_threshold=1, timeout=6, stat_flag=False, stat_output='', smart_evict2_flag=False):
         general.ReplaceAlgo.__init__(self, cache_capacity)
         self.f_prefetch = open(f_uploaded)
         self.prefetch_interval = p_interval
@@ -18,7 +18,8 @@ class OnLine_LRU(general.ReplaceAlgo):
         self.reserve_line = []
         self.mode = p_mode1
         self.mode2 = p_mode2 == 0
-        self.size_m5 = 16484 # m5 is the highest resolution, and the average size of resolution m5 is 16KB (34.78%)
+        self.size_m5 = 16484 # m5 is the highest resolution, and the average size of resolution m5 is 16KB
+                             # (34.78%)
         self.size_c5 = 40960 # c5 is the second highest resolution, its size is 40KB (14.98%)
         self.size_m0 = 16484 # m0 is the third highest resolution, its size is 16KB (13.35%)
         self.size_b5 = 77824 # b5 is the forth highest resolution, its size is 76KB (12.95%)
@@ -27,17 +28,24 @@ class OnLine_LRU(general.ReplaceAlgo):
         self.size_a0 = 4096 # a0 is the seventh highest resolution, its size is 4KB (5.38%)
         self.size_a5 = 4096 # a5 is the lowest resolution, its size is 4KB (4.75%)
 
-        # stat_flag is used to count freq of both prefetched and non-prefetched object in their lifetime, thus we can infer whether they exceed threshold and should be evict.
+        # stat_flag is used to count freq of both prefetched and non-prefetched
+        # object in their lifetime, thus we can infer whether they exceed
+        # threshold and should be evict.
         self.stat_flag = stat_flag
         self.smart_evict_flag = smart_evict_flag
+        self.smart_evict2_flag = smart_evict2_flag
         if stat_flag:
             self.f_stat_out = open('lru_prefetch_' + stat_output, 'w', newline='\n')
         if smart_evict_flag:
-            # Ghost queue only contains prefetched photos' meta data, when a photo timeout or freq is lower then threshold, it is evicted preferentially.
+            # Ghost queue only contains prefetched photos' meta data, when a
+            # photo timeout or freq is lower then threshold, it is evicted
+            # preferentially.
             self.No_prefetch = 1 # the No.prefetch to prefetch
             self.timeout = timeout
             self.freq_threshold = freq_threshold
             self.smart_evict_queue = collections.OrderedDict()
+        if smart_evict2_flag:
+            self.smart_evict2_table = dict()
 
     def my_release(self):
         self.f_prefetch.close()
@@ -54,19 +62,27 @@ class OnLine_LRU(general.ReplaceAlgo):
         key = s[0] + s[1] + s[2]
         value = s[3]
         if self.get(key):
-            if self.trigger:
-                self.cache_stack[key].stat_count += 1
-                self.hc += 1
-                self.bhc += value
             if self.smart_evict_flag:
                 if key in self.smart_evict_queue:
                     self.smart_evict_queue[key][1] += 1
                     if self.smart_evict_queue[key][1] > self.freq_threshold:
                         del self.smart_evict_queue[key]
+            if self.smart_evict2_flag:
+                id = key[0:-2]
+                rez = key[-2:]
+                for x in range(len(self.smart_evict2_table[id])):
+                    if self.smart_evict2_table[id][x][0] == rez:
+                        self.smart_evict2_table[id][x][1] += 1
+            if self.trigger:
+                self.cache_stack[key].stat_count += 1
+                self.hc += 1
+                self.bhc += value
         else:
             self.evict(value)
             ob = [key, general.Node(value)]
             self.set(ob)
+            if self.smart_evict2_flag:
+                self.smart2_set(key, 1)
             if self.trigger:
                 self.write2disk += value
                 self.transportfrombackend += value
@@ -85,25 +101,60 @@ class OnLine_LRU(general.ReplaceAlgo):
         self.cache_stack[ob[0]] = ob[1]
         self.cache_size += ob[1].size
 
-    def smart_set(self, ob):
-        self.smart_evict_queue[ob[0]] = [self.No_prefetch, 0] # No. prefetch, freq
+    def smart_set(self, key):
+        self.smart_evict_queue[key] = [self.No_prefetch, 0] # No.  prefetch, freq
+
+    def smart2_set(self, key, freq):
+        id = key[0:-2]
+        rez = key[-2:]
+        if id in self.smart_evict2_table:
+            self.smart_evict2_table[id].append([rez, freq])
+        else:
+            self.smart_evict2_table[id] = [[rez, freq]] # resolution, freq
 
     def evict(self, value):
         while self.cache_size + value > self.cache_capacity:
-            if self.smart_evict_flag and \
-               len(self.smart_evict_queue) and \
-               self.No_prefetch - next(iter(self.smart_evict_queue.values()))[0] > self.timeout:
-               #self.No_prefetch - next(reversed(self.smart_evict_queue.values()))[0] > self.timeout:
-                ghost_ob = self.smart_evict_queue.popitem(last=False)
-                ob = self.cache_stack.popitem(ghost_ob[0])
-            else:
+            if self.smart_evict_flag: # smart evict
+                smart_evict()
+            elif self.smart_evict2_flag: # smart evict 2
                 ob = self.cache_stack.popitem(last=False)
-                if self.smart_evict_flag:
-                    if ob[0] in self.smart_evict_queue: # never exec on theory
-                        del self.smart_evict_queue[ob[0]]
-            self.cache_size -= ob[1].size
-            if self.trigger and self.stat_flag:
+                self.cache_size -= ob[1].size
+                self.smart_evict2(ob[0])
+            else: # normal evict
+                ob = self.cache_stack.popitem(last=False)
+                self.cache_size -= ob[1].size
+            if self.trigger and self.stat_flag: # does not work in smart evict 2!!!
                 self.f_stat_out.write('{} {} {}\n'.format(ob[0], ob[1].source_flag, ob[1].stat_count))
+    
+    def smart_evict(self):
+        if len(self.smart_evict_queue) and \
+           self.No_prefetch - next(iter(self.smart_evict_queue.values()))[0] > self.timeout:
+            ghost_ob = self.smart_evict_queue.popitem(last=False)
+            ob = self.cache_stack.popitem(ghost_ob[0])
+        else:
+            ob = self.cache_stack.popitem(last=False)
+            if ob[0] in self.smart_evict_queue: # should never exec on theory
+                del self.smart_evict_queue[ob[0]]
+        self.cache_size -= ob[1].size
+        if self.smart_evict2_flag:
+            self.smart_evict2(ob[0])
+    
+    def smart_evict2(self, key):
+        id = key[0:-2]
+        rez0 = key[-2:]
+        group_evict_list = []
+        for x in self.smart_evict2_table[id]:
+            if x[0] == rez0:
+                group_evict_list.append(x)
+            else:
+                if x[1] < 2: # this can be a tunable parameter
+                    self.cache_size -= self.cache_stack[id + x[0]].size
+                    del self.cache_stack[id + x[0]]
+                    group_evict_list.append(x)
+        for x in group_evict_list:
+            self.smart_evict2_table[id].remove(x)
+        if not self.smart_evict2_table[id]:
+            del self.smart_evict2_table[id]
 
     def prefetch(self, currenttime):
         while True:
@@ -174,7 +225,9 @@ class OnLine_LRU(general.ReplaceAlgo):
             ob[1].stat_count = 0
             self.set(ob)
             if self.smart_evict_flag:
-                self.smart_set(ob)
+                self.smart_set(_key)
+            if self.smart_evict2_flag:
+                self.smart2_set(_key, 0)
             if self.trigger:
                 self.write2disk += _value
                 self.transportfrombackend += _value

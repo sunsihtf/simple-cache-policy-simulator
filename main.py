@@ -54,7 +54,8 @@ def process(parameter):
                                                               freq_threshold=parameter[3][1],
                                                               timeout=parameter[3][0],
                                                               stat_flag = statflag,
-                                                              stat_output = statoutput)
+                                                              stat_output = statoutput,
+                                                              smart_evict2_flag = smf2)
             else:
                 replacement_method = online_prefetch_lru.OnLine_LRU(cache_capacity * GIGABYTE,
                                                                parameter[0],
@@ -62,7 +63,8 @@ def process(parameter):
                                                                parameter[2],
                                                                parameter[3],
                                                                stat_flag = statflag,
-                                                               stat_output = statoutput)
+                                                               stat_output = statoutput,
+                                                               smart_evict2_flag = smf2)
         elif method_sel == 'online_slru':
             replacement_method = online_prefetch_slru.OnLine_SLRU(cache_capacity * GIGABYTE,
                                                            parameter[0],
@@ -132,13 +134,16 @@ if __name__ == '__main__':
     prefetch_interval = [int(x) for x in config['settings']['PREFETCH_INTERVAL'].split()] # 1: realtime, 600: 10min, 3600: 1hour
 
     smart_evict_flag = False
+    smf2 = False # smart evict 2 flag
     if int(config['settings']['SMART_EVICT_FLAG']) == 1:
         smart_evict_flag = True
         _ft = [int(x) for x in config['settings']['FREQ_THRESHOLD'].spilt()] #ft: freq threshold
         _tot = [int(x) for x in config['settings']['TIMEOUT_THRESHOLD'].split()] # tot: timeout threshold, switching to various timeout
+    if int(config['settings']['SMART_EVICT2_FLAG']) == 1:
+        smf2 = True
     
     statflag = False
-    stat_output = ''
+    statoutput = ''
     if 'lru' in method_set or 'online_lru' in method_set:
         if int(config['settings']['STAT_FLAG']) == 1:
             statflag = True
@@ -165,6 +170,8 @@ if __name__ == '__main__':
         print('\n  STAT_FLAG                    = ', config['settings']['STAT_FLAG'])
         if statflag:
             print('\n  STAT_OUTPUT                  = ', config['settings']['STAT_OUTPUT'])
+    if 'online_lru' in model_set:
+        print('\n  SMART_EVICT2_FLAG            = ', config['settings']['SMART_EVICT2_FLAG'])
         
     for method_sel in method_set:
         if method_sel == 'online_lru':
