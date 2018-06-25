@@ -1,2 +1,4 @@
 *.pyproj
 *.sln
+.vs
+.vscode
